@@ -1,0 +1,1 @@
+This is the paint worklet discussed in an [episode of HTTP 203](https://www.youtube.com/watch?v=ALKqavp9Fg0&list=PLNYkxOF6rcIAKIQFsNbV0JDws_G_bnNo9). The [original effect](https://codepen.io/georgedoescode/full/eYvjOMN) is by [George Francis](https://twitter.com/georgedoescode).

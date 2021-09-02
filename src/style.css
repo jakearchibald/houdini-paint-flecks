@@ -1,0 +1,29 @@
+@property --fleck-colors {
+  syntax: '<color>+';
+  initial-value: black white;
+  inherits: true;
+}
+
+@property --fleck-seed {
+  syntax: '<integer>';
+  initial-value: 1;
+  inherits: true;
+}
+
+@property --fleck-cell-size {
+  syntax: '<integer>';
+  initial-value: 300;
+  inherits: true;
+}
+
+@property --fleck-density {
+  syntax: '<integer>';
+  initial-value: 300;
+  inherits: true;
+}
+
+@property --fleck-size-base {
+  syntax: '<length>';
+  initial-value: 4px;
+  inherits: true;
+}
