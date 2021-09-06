@@ -86,26 +86,22 @@ function drawBlob(ctx, random, x, y, size, color) {
   ctx.resetTransform();
 }
 
-class Mulberry32 {
-  constructor(seed) {
-    this.state = seed;
-  }
+function createRandom(seed) {
+  const state = new Uint32Array(1);
+  state[0] = seed;
 
-  next() {
-    this.state |= 0;
-    this.state = (this.state + 0x6d2b79f5) | 0;
-    var t = Math.imul(this.state ^ (this.state >>> 15), 1 | this.state);
+  const next = () => {
+    const innerState = (state[0] = (state[0] + 0x6d2b79f5) | 0);
+    var t = Math.imul(innerState ^ (innerState >>> 15), 1 | innerState);
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  }
+  };
 
-  nextBetween(from, to) {
-    return from + (to - from) * this.next();
-  }
-
-  fork() {
-    return new Mulberry32(this.next() * 2 ** 32);
-  }
+  return {
+    next,
+    nextBetween: (from, to) => next() * (to - from) + from,
+    fork: () => createRandom(next() * 2 ** 32),
+  };
 }
 
 registerPaint(
@@ -128,7 +124,7 @@ registerPaint(
       const baseSize = props.get('--fleck-size-base').value;
       const colors = props.getAll('--fleck-colors').map((s) => s.toString());
 
-      const randomX = new Mulberry32(seed);
+      const randomX = createRandom(seed);
 
       for (let x = 0; x < width; x += cellSize) {
         const randomY = randomX.fork();
