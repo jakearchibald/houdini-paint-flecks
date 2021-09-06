@@ -1,6 +1,6 @@
 {
   "name": "houdini-paint-flecks",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "CSS paint fleck effect",
   "main": "dist/index-min.js",
   "scripts": {
