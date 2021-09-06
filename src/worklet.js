@@ -1,30 +1,20 @@
 const maxPointDistance = 0.5;
 
-function randomizePoint(point, random) {
-  const distance = random.next() * maxPointDistance;
-  const angle = random.next() * Math.PI * 2;
-  const xShift = Math.sin(angle) * distance;
-  const yShift = Math.cos(angle) * distance;
-  return [
-    point[0] + xShift,
-    point[1] + yShift,
-    point[2] + xShift,
-    point[3] + yShift,
-    point[4] + xShift,
-    point[5] + yShift,
-  ];
-}
-
 /** Bezier points for a seven point circle, to 3 decimal places */
-const sevenPointCircle = [
-  [-0.304, -1, 0, -1, 0.304, -1],
-  [0.592, -0.861, 0.782, -0.623, 0.972, -0.386],
-  [1.043, -0.074, 0.975, 0.223, 0.907, 0.519],
-  [0.708, 0.769, 0.434, 0.901, 0.16, 1.033],
-  [-0.16, 1.033, -0.434, 0.901, -0.708, 0.769],
-  [-0.907, 0.519, -0.975, 0.223, -1.043, -0.074],
-  [-0.972, -0.386, -0.782, -0.623, -0.592, -0.861],
-];
+// prettier-ignore
+const sevenPointCircle = new Float64Array([
+  -0.304, -1, 0, -1, 0.304, -1,
+  0.592, -0.861, 0.782, -0.623, 0.972, -0.386,
+  1.043, -0.074, 0.975, 0.223, 0.907, 0.519,
+  0.708, 0.769, 0.434, 0.901, 0.16, 1.033,
+  -0.16, 1.033, -0.434, 0.901, -0.708, 0.769,
+  -0.907, 0.519, -0.975, 0.223, -1.043, -0.074,
+  -0.972, -0.386, -0.782, -0.623, -0.592, -0.861,
+]);
+const entriesPerPoint = 6;
+
+// This is reused for all blob points to reduce GC.
+const blobPoints = new Float64Array(sevenPointCircle.length);
 
 /*
 // Here's how I created the above (although DOMMatrix isn't available in worklets):
@@ -51,50 +41,71 @@ function createBezierCirclePoints(points) {
 }
 */
 
-function drawPoints(ctx, points) {
+function drawPoints(ctx) {
   ctx.beginPath();
-  ctx.moveTo(points[0][2], points[0][3]);
-  for (let i = 0; i < points.length; i++) {
-    const nextI = i === points.length - 1 ? 0 : i + 1;
+  ctx.moveTo(blobPoints[2], blobPoints[3]);
+  for (let i = 0; i < blobPoints.length; i += entriesPerPoint) {
+    const nextI =
+      i + entriesPerPoint === blobPoints.length ? 0 : i + entriesPerPoint;
+
     ctx.bezierCurveTo(
-      points[i][4],
-      points[i][5],
-      points[nextI][0],
-      points[nextI][1],
-      points[nextI][2],
-      points[nextI][3],
+      blobPoints[i + 4],
+      blobPoints[i + 5],
+      blobPoints[nextI],
+      blobPoints[nextI + 1],
+      blobPoints[nextI + 2],
+      blobPoints[nextI + 3],
     );
   }
+
   ctx.closePath();
 }
 
-function drawBlob(ctx, { random, x, y, size, color }) {
-  const points = sevenPointCircle.map((point) => randomizePoint(point, random));
-  ctx.save();
+function drawBlob(ctx, random, x, y, size, color) {
+  // Reset points
+  blobPoints.set(sevenPointCircle);
+
+  // Randomly shift the points a bit
+  for (let i = 0; i < blobPoints.length; i += entriesPerPoint) {
+    const distance = random.next() * maxPointDistance;
+    const angle = random.next() * Math.PI * 2;
+    const xShift = Math.sin(angle) * distance;
+    const yShift = Math.cos(angle) * distance;
+    blobPoints[i] += xShift;
+    blobPoints[i + 1] += yShift;
+    blobPoints[i + 2] += xShift;
+    blobPoints[i + 3] += yShift;
+    blobPoints[i + 4] += xShift;
+    blobPoints[i + 5] += yShift;
+  }
+
   ctx.fillStyle = color;
-  ctx.translate(x, y);
-  ctx.scale(size, size);
-  drawPoints(ctx, points);
+  ctx.setTransform(size, 0, 0, size, x, y);
+  drawPoints(ctx);
   ctx.fill();
-  ctx.restore();
+  ctx.resetTransform();
 }
 
-function createRandom(seed) {
-  let state = seed;
+class Mulberry32 {
+  constructor(seed) {
+    this.state = seed;
+  }
 
-  const next = () => {
-    state |= 0;
-    state = (state + 0x6d2b79f5) | 0;
-    var t = Math.imul(state ^ (state >>> 15), 1 | state);
+  next() {
+    this.state |= 0;
+    this.state = (this.state + 0x6d2b79f5) | 0;
+    var t = Math.imul(this.state ^ (this.state >>> 15), 1 | this.state);
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+  }
 
-  return {
-    next,
-    nextBetween: (from, to) => next() * (to - from) + from,
-    fork: () => createRandom(next() * 2 ** 32),
-  };
+  nextBetween(from, to) {
+    return from + (to - from) * this.next();
+  }
+
+  fork() {
+    return new Mulberry32(this.next() * 2 ** 32);
+  }
 }
 
 registerPaint(
@@ -117,7 +128,7 @@ registerPaint(
       const baseSize = props.get('--fleck-size-base').value;
       const colors = props.getAll('--fleck-colors').map((s) => s.toString());
 
-      const randomX = createRandom(seed);
+      const randomX = new Mulberry32(seed);
 
       for (let x = 0; x < width; x += cellSize) {
         const randomY = randomX.fork();
@@ -135,13 +146,14 @@ registerPaint(
             const color =
               colors[Math.floor(randomItem.nextBetween(0, colors.length))];
 
-            drawBlob(ctx, {
-              random: randomItem,
-              x: x + randomItem.nextBetween(0, cellSize),
-              y: y + randomItem.nextBetween(0, cellSize),
-              size: radius,
+            drawBlob(
+              ctx,
+              randomItem,
+              x + randomItem.nextBetween(0, cellSize),
+              y + randomItem.nextBetween(0, cellSize),
+              radius,
               color,
-            });
+            );
           }
         }
       }
