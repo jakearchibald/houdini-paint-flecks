@@ -4,14 +4,18 @@ import cssStr from './lib/css-str';
 import iifeStr from './lib/iife-str';
 
 export default async function () {
-  await del('.tmp/build');
+  await del('./dist');
 
-  return {
+  return [true, false].map((minify) => ({
     input: './src/index.js',
     output: {
-      file: './dist/index.js',
+      file: `./dist/index${minify ? '-min' : ''}.js`,
       format: 'iife',
     },
-    plugins: [terser(), cssStr(), iifeStr()],
-  };
+    plugins: [
+      minify && terser(),
+      cssStr({ minify }),
+      iifeStr({ minify }),
+    ].filter((v) => v),
+  }));
 }

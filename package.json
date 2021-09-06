@@ -2,7 +2,7 @@
   "name": "houdini-paint-flecks",
   "version": "1.0.0",
   "description": "CSS paint fleck effect",
-  "main": "dist/index.js",
+  "main": "dist/index-min.js",
   "scripts": {
     "prepack": "npm run build",
     "build": "rollup -c"
